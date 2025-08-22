@@ -1,0 +1,1672 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeMaster Pro - Complete Typing Mastery</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .typing-cursor { animation: blink 1s infinite; }
+        @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+        .game-card { transition: all 0.3s ease; }
+        .game-card:hover { transform: translateY(-4px); }
+        .correct-char { color: #10b981; }
+        .incorrect-char { color: #ef4444; background-color: rgba(239, 68, 68, 0.1); }
+        .current-char { background-color: #3b82f6; color: white; }
+        .level-progress { transition: width 0.5s ease; }
+        .achievement-bounce { animation: bounce 0.6s ease-in-out; }
+        @keyframes bounce { 0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); } 40%, 43% { transform: translate3d(0,-30px,0); } 70% { transform: translate3d(0,-15px,0); } 90% { transform: translate3d(0,-4px,0); } }
+        .floating-score { animation: floatUp 2s ease-out forwards; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-50px); } }
+        .streak-fire { animation: fire 0.5s ease-in-out infinite alternate; }
+        @keyframes fire { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // Enhanced data structures
+        const sampleTexts = {
+            beginner: [
+                "The cat sat on the mat. It was a sunny day. The birds were singing in the trees.",
+                "I like to read books. Books help me learn new things. Reading is fun and exciting.",
+                "The sun is bright today. The sky is blue and clear. It is a perfect day to play outside."
+            ],
+            intermediate: [
+                "The quick brown fox jumps over the lazy dog. This pangram contains every letter of the alphabet at least once.",
+                "Programming is not about what you know; it's about what you can figure out. Every expert was once a beginner.",
+                "In the world of technology, the only constant is change. Adaptation and continuous learning are key to success."
+            ],
+            advanced: [
+                "Artificial intelligence and machine learning algorithms are revolutionizing industries across the globe, from healthcare diagnostics to autonomous vehicle navigation systems.",
+                "The implementation of quantum computing principles requires understanding complex mathematical concepts including superposition, entanglement, and quantum interference patterns.",
+                "Cryptocurrency blockchain technology utilizes cryptographic hash functions and distributed consensus mechanisms to maintain decentralized ledger integrity."
+            ]
+        };
+
+        const lessons = {
+            1: { title: "Home Row Mastery", keys: "asdf jkl;", description: "Master the foundation keys" },
+            2: { title: "Top Row Adventure", keys: "qwer tyui", description: "Reach for the top row" },
+            3: { title: "Bottom Row Challenge", keys: "zxcv bnm,", description: "Complete the alphabet" },
+            4: { title: "Number Power", keys: "1234 5678", description: "Add numbers to your skills" },
+            5: { title: "Symbol Mastery", keys: "!@#$ %^&*", description: "Special characters and symbols" },
+            6: { title: "Punctuation Pro", keys: ".,;: '\"?!", description: "Perfect your punctuation" }
+        };
+
+        const achievements = [
+            { id: 'first_test', title: 'First Steps', description: 'Complete your first typing test', icon: '🎯', unlocked: false },
+            { id: 'speed_demon', title: 'Speed Demon', description: 'Reach 60 WPM', icon: '⚡', unlocked: false },
+            { id: 'accuracy_ace', title: 'Accuracy Ace', description: 'Achieve 95% accuracy', icon: '🎯', unlocked: false },
+            { id: 'streak_master', title: 'Streak Master', description: 'Get a 10-day practice streak', icon: '🔥', unlocked: false },
+            { id: 'lesson_graduate', title: 'Lesson Graduate', description: 'Complete all lessons', icon: '🎓', unlocked: false }
+        ];
+
+        const motivationalQuotes = [
+            "Every expert was once a beginner. Keep typing!",
+            "Progress, not perfection. You're improving with every keystroke!",
+            "The keyboard is your canvas, and words are your art.",
+            "Speed comes with practice, accuracy comes with patience.",
+            "You're building muscle memory that will last a lifetime!",
+            "Each mistake is a step closer to mastery.",
+            "Consistency beats intensity. Keep showing up!",
+            "Your fingers are learning to dance across the keys."
+        ];
+
+        // Main App Component
+        function App() {
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [userProfile, setUserProfile] = useState({
+                level: 1,
+                xp: 0,
+                totalTests: 0,
+                bestWPM: 0,
+                averageAccuracy: 0,
+                streak: 0,
+                lastPractice: null,
+                achievements: achievements,
+                completedLessons: []
+            });
+
+            const [showAchievement, setShowAchievement] = useState(null);
+
+            const unlockAchievement = (achievementId) => {
+                setUserProfile(prev => {
+                    const newAchievements = prev.achievements.map(ach => 
+                        ach.id === achievementId ? { ...ach, unlocked: true } : ach
+                    );
+                    return { ...prev, achievements: newAchievements };
+                });
+                
+                const achievement = achievements.find(a => a.id === achievementId);
+                if (achievement) {
+                    setShowAchievement(achievement);
+                    setTimeout(() => setShowAchievement(null), 3000);
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-4">
+                    {/* Achievement Notification */}
+                    {showAchievement && (
+                        <div className="fixed top-4 right-4 z-50 achievement-bounce">
+                            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-4 rounded-lg shadow-lg">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-2xl">{showAchievement.icon}</span>
+                                    <div>
+                                        <div className="font-bold">Achievement Unlocked!</div>
+                                        <div className="text-sm">{showAchievement.title}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <header className="text-center mb-8">
+                        <h1 className="text-5xl font-bold text-white mb-2">
+                            Type<span className="text-blue-400">Master</span> <span className="text-yellow-400">Pro</span>
+                        </h1>
+                        <p className="text-gray-300 text-lg">Your Complete Typing Mastery Journey</p>
+                    </header>
+
+                    {currentView === 'dashboard' && (
+                        <Dashboard 
+                            setCurrentView={setCurrentView} 
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                        />
+                    )}
+                    
+                    {currentView === 'lessons' && (
+                        <LessonMode 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                            unlockAchievement={unlockAchievement}
+                        />
+                    )}
+
+                    {currentView === 'games' && (
+                        <GameHub 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                            unlockAchievement={unlockAchievement}
+                        />
+                    )}
+
+                    {currentView === 'progress' && (
+                        <ProgressTracker 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                        />
+                    )}
+
+                    {currentView === 'motivation' && (
+                        <MotivationCenter 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                        />
+                    )}
+
+                    {/* Game Views */}
+                    {currentView === 'classic' && (
+                        <ClassicTypingGame 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                            unlockAchievement={unlockAchievement}
+                        />
+                    )}
+
+                    {currentView === 'zen' && (
+                        <ZenMode 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                        />
+                    )}
+
+                    {currentView === 'race' && (
+                        <TypeRacer 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                        />
+                    )}
+
+                    {currentView === 'ninja' && (
+                        <TypingNinja 
+                            setCurrentView={setCurrentView}
+                            userProfile={userProfile}
+                            setUserProfile={setUserProfile}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        // Dashboard Component
+        function Dashboard({ setCurrentView, userProfile, setUserProfile }) {
+            const [dailyQuote, setDailyQuote] = useState('');
+
+            useEffect(() => {
+                setDailyQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
+            }, []);
+
+            const levelProgress = (userProfile.xp % 1000) / 1000 * 100;
+            const nextLevelXP = 1000 - (userProfile.xp % 1000);
+
+            return (
+                <div className="max-w-7xl mx-auto">
+                    {/* User Profile Header */}
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 mb-8 text-white">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-3xl font-bold mb-2">Welcome back, Typing Master!</h2>
+                                <p className="text-blue-100">{dailyQuote}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-4xl font-bold">Level {userProfile.level}</div>
+                                <div className="text-blue-200">{nextLevelXP} XP to next level</div>
+                                <div className="w-48 bg-blue-800 rounded-full h-2 mt-2">
+                                    <div 
+                                        className="bg-yellow-400 h-2 rounded-full level-progress"
+                                        style={{ width: `${levelProgress}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-white">{userProfile.bestWPM}</div>
+                            <div className="text-gray-300">Best WPM</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-green-400">{userProfile.averageAccuracy}%</div>
+                            <div className="text-gray-300">Avg Accuracy</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-orange-400 flex items-center justify-center gap-1">
+                                {userProfile.streak} <span className={userProfile.streak > 0 ? 'streak-fire' : ''}>🔥</span>
+                            </div>
+                            <div className="text-gray-300">Day Streak</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-purple-400">{userProfile.totalTests}</div>
+                            <div className="text-gray-300">Tests Taken</div>
+                        </div>
+                    </div>
+
+                    {/* Navigation Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <NavigationCard
+                            title="Structured Lessons"
+                            description="Follow our comprehensive curriculum"
+                            icon="📚"
+                            color="from-green-500 to-green-600"
+                            onClick={() => setCurrentView('lessons')}
+                        />
+                        <NavigationCard
+                            title="Typing Games"
+                            description="Fun games to improve your skills"
+                            icon="🎮"
+                            color="from-blue-500 to-blue-600"
+                            onClick={() => setCurrentView('games')}
+                        />
+                        <NavigationCard
+                            title="Progress Tracker"
+                            description="Detailed analytics and insights"
+                            icon="📊"
+                            color="from-purple-500 to-purple-600"
+                            onClick={() => setCurrentView('progress')}
+                        />
+                        <NavigationCard
+                            title="Motivation Hub"
+                            description="Stay motivated and inspired"
+                            icon="💪"
+                            color="from-orange-500 to-orange-600"
+                            onClick={() => setCurrentView('motivation')}
+                        />
+                    </div>
+
+                    {/* Recent Achievements */}
+                    <div className="mt-8">
+                        <h3 className="text-2xl font-bold text-white mb-4">Recent Achievements</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {userProfile.achievements.filter(a => a.unlocked).slice(-3).map(achievement => (
+                                <div key={achievement.id} className="bg-white/10 backdrop-blur-lg rounded-lg p-4 flex items-center gap-3">
+                                    <span className="text-2xl">{achievement.icon}</span>
+                                    <div>
+                                        <div className="text-white font-semibold">{achievement.title}</div>
+                                        <div className="text-gray-300 text-sm">{achievement.description}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Navigation Card Component
+        function NavigationCard({ title, description, icon, color, onClick }) {
+            return (
+                <div
+                    className="game-card bg-white/10 backdrop-blur-lg rounded-xl p-6 cursor-pointer hover:bg-white/20"
+                    onClick={onClick}
+                >
+                    <div className="text-4xl mb-4 text-center">{icon}</div>
+                    <h3 className="text-xl font-bold text-white mb-2 text-center">{title}</h3>
+                    <p className="text-gray-300 text-center mb-4">{description}</p>
+                    <div className={`bg-gradient-to-r ${color} text-white py-2 px-4 rounded-lg text-center font-semibold hover:shadow-lg transition-all`}>
+                        Start
+                    </div>
+                </div>
+            );
+        }
+
+        // Lesson Mode Component
+        function LessonMode({ setCurrentView, userProfile, setUserProfile, unlockAchievement }) {
+            const [currentLesson, setCurrentLesson] = useState(null);
+            const [lessonText, setLessonText] = useState('');
+            const [userInput, setUserInput] = useState('');
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [mistakes, setMistakes] = useState(0);
+            const [startTime, setStartTime] = useState(null);
+            const [isComplete, setIsComplete] = useState(false);
+            const inputRef = useRef(null);
+
+            const startLesson = (lessonNum) => {
+                const lesson = lessons[lessonNum];
+                setCurrentLesson(lessonNum);
+                setLessonText(lesson.keys.repeat(10) + ' ' + lesson.keys.split('').reverse().join(''));
+                setUserInput('');
+                setCurrentIndex(0);
+                setMistakes(0);
+                setStartTime(null);
+                setIsComplete(false);
+                setTimeout(() => inputRef.current?.focus(), 100);
+            };
+
+            const handleInputChange = (e) => {
+                const value = e.target.value;
+                
+                if (!startTime && value.length === 1) {
+                    setStartTime(Date.now());
+                }
+
+                if (value.length > userInput.length) {
+                    const newChar = value[value.length - 1];
+                    const expectedChar = lessonText[currentIndex];
+                    
+                    if (newChar !== expectedChar) {
+                        setMistakes(mistakes + 1);
+                    }
+                }
+
+                setUserInput(value);
+                setCurrentIndex(value.length);
+
+                if (value === lessonText) {
+                    const endTime = Date.now();
+                    const timeInMinutes = (endTime - startTime) / 60000;
+                    const wpm = Math.round((lessonText.split(' ').length) / timeInMinutes);
+                    const accuracy = Math.round(((lessonText.length - mistakes) / lessonText.length) * 100);
+                    
+                    setIsComplete(true);
+                    
+                    // Update user profile
+                    setUserProfile(prev => ({
+                        ...prev,
+                        xp: prev.xp + 100,
+                        level: Math.floor((prev.xp + 100) / 1000) + 1,
+                        completedLessons: [...prev.completedLessons, currentLesson],
+                        bestWPM: Math.max(prev.bestWPM, wpm),
+                        averageAccuracy: Math.round(((prev.averageAccuracy * prev.totalTests) + accuracy) / (prev.totalTests + 1)),
+                        totalTests: prev.totalTests + 1
+                    }));
+
+                    if (userProfile.completedLessons.length + 1 === Object.keys(lessons).length) {
+                        unlockAchievement('lesson_graduate');
+                    }
+                }
+            };
+
+            const renderText = () => {
+                return lessonText.split('').map((char, index) => {
+                    let className = 'text-xl ';
+                    
+                    if (index < userInput.length) {
+                        className += userInput[index] === char ? 'correct-char' : 'incorrect-char';
+                    } else if (index === currentIndex) {
+                        className += 'current-char';
+                    } else {
+                        className += 'text-gray-400';
+                    }
+                    
+                    return (
+                        <span key={index} className={className}>
+                            {char === ' ' ? '␣' : char}
+                        </span>
+                    );
+                });
+            };
+
+            if (currentLesson) {
+                return (
+                    <div className="max-w-4xl mx-auto">
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-3xl font-bold text-white">
+                                    Lesson {currentLesson}: {lessons[currentLesson].title}
+                                </h2>
+                                <button
+                                    onClick={() => setCurrentLesson(null)}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                >
+                                    Back to Lessons
+                                </button>
+                            </div>
+
+                            <div className="mb-6 text-center">
+                                <p className="text-gray-300 text-lg">{lessons[currentLesson].description}</p>
+                                <p className="text-blue-400 font-mono text-xl mt-2">Focus on: {lessons[currentLesson].keys}</p>
+                            </div>
+
+                            {/* Progress Stats */}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                                <div className="bg-white/10 rounded-lg p-4 text-center">
+                                    <div className="text-2xl font-bold text-green-400">
+                                        {Math.round((currentIndex / lessonText.length) * 100)}%
+                                    </div>
+                                    <div className="text-gray-300">Progress</div>
+                                </div>
+                                <div className="bg-white/10 rounded-lg p-4 text-center">
+                                    <div className="text-2xl font-bold text-red-400">{mistakes}</div>
+                                    <div className="text-gray-300">Mistakes</div>
+                                </div>
+                                <div className="bg-white/10 rounded-lg p-4 text-center">
+                                    <div className="text-2xl font-bold text-blue-400">
+                                        {startTime ? Math.round((Date.now() - startTime) / 1000) : 0}s
+                                    </div>
+                                    <div className="text-gray-300">Time</div>
+                                </div>
+                            </div>
+
+                            {/* Text Display */}
+                            <div className="bg-white/5 rounded-lg p-6 mb-6 font-mono text-center leading-relaxed">
+                                {renderText()}
+                                {currentIndex === lessonText.length && <span className="typing-cursor text-blue-400">|</span>}
+                            </div>
+
+                            {/* Input */}
+                            <textarea
+                                ref={inputRef}
+                                value={userInput}
+                                onChange={handleInputChange}
+                                className="w-full bg-white/10 text-white rounded-lg p-4 text-xl font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                rows="3"
+                                placeholder="Start typing the lesson text..."
+                                disabled={isComplete}
+                            />
+
+                            {/* Completion */}
+                            {isComplete && (
+                                <div className="mt-6 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-white mb-4">Lesson Complete! 🎉</h3>
+                                    <p className="text-white mb-4">+100 XP earned!</p>
+                                    <div className="flex gap-4 justify-center">
+                                        <button
+                                            onClick={() => startLesson(currentLesson)}
+                                            className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                        >
+                                            Practice Again
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentLesson(null)}
+                                            className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                        >
+                                            Next Lesson
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-4xl font-bold text-white">Structured Learning Path</h2>
+                        <button
+                            onClick={() => setCurrentView('dashboard')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors"
+                        >
+                            Back to Dashboard
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Object.entries(lessons).map(([num, lesson]) => {
+                            const isCompleted = userProfile.completedLessons.includes(parseInt(num));
+                            const isLocked = parseInt(num) > 1 && !userProfile.completedLessons.includes(parseInt(num) - 1);
+                            
+                            return (
+                                <div
+                                    key={num}
+                                    className={`bg-white/10 backdrop-blur-lg rounded-xl p-6 cursor-pointer transition-all ${
+                                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/20'
+                                    }`}
+                                    onClick={() => !isLocked && startLesson(parseInt(num))}
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="text-xl font-bold text-white">Lesson {num}</h3>
+                                        {isCompleted && <span className="text-green-400 text-2xl">✅</span>}
+                                        {isLocked && <span className="text-gray-400 text-2xl">🔒</span>}
+                                    </div>
+                                    <h4 className="text-lg font-semibold text-blue-400 mb-2">{lesson.title}</h4>
+                                    <p className="text-gray-300 mb-4">{lesson.description}</p>
+                                    <div className="bg-white/10 rounded-lg p-3 font-mono text-center text-blue-300">
+                                        {lesson.keys}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // Game Hub Component
+        function GameHub({ setCurrentView, userProfile, setUserProfile, unlockAchievement }) {
+            const games = [
+                {
+                    id: 'classic',
+                    title: 'Classic Test',
+                    description: 'Traditional typing speed test',
+                    icon: '⌨️',
+                    color: 'from-blue-500 to-blue-600',
+                    difficulty: 'All Levels'
+                },
+                {
+                    id: 'zen',
+                    title: 'Zen Mode',
+                    description: 'Peaceful, distraction-free typing',
+                    icon: '🧘',
+                    color: 'from-green-500 to-green-600',
+                    difficulty: 'Relaxing'
+                },
+                {
+                    id: 'race',
+                    title: 'Type Racer',
+                    description: 'Race against time and opponents',
+                    icon: '🏎️',
+                    color: 'from-red-500 to-red-600',
+                    difficulty: 'Competitive'
+                },
+                {
+                    id: 'ninja',
+                    title: 'Typing Ninja',
+                    description: 'Fast-paced word slashing action',
+                    icon: '🥷',
+                    color: 'from-purple-500 to-purple-600',
+                    difficulty: 'Expert'
+                }
+            ];
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-4xl font-bold text-white">Typing Games Arena</h2>
+                        <button
+                            onClick={() => setCurrentView('dashboard')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors"
+                        >
+                            Back to Dashboard
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {games.map(game => (
+                            <div
+                                key={game.id}
+                                className="game-card bg-white/10 backdrop-blur-lg rounded-xl p-8 cursor-pointer hover:bg-white/20"
+                                onClick={() => setCurrentView(game.id)}
+                            >
+                                <div className="text-6xl mb-4 text-center">{game.icon}</div>
+                                <h3 className="text-2xl font-bold text-white mb-3 text-center">{game.title}</h3>
+                                <p className="text-gray-300 text-center mb-4">{game.description}</p>
+                                <div className="text-center mb-6">
+                                    <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                                        {game.difficulty}
+                                    </span>
+                                </div>
+                                <div className={`bg-gradient-to-r ${game.color} text-white py-3 px-6 rounded-lg text-center font-semibold hover:shadow-lg transition-all`}>
+                                    Play Now
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Enhanced Classic Typing Game
+        function ClassicTypingGame({ setCurrentView, userProfile, setUserProfile, unlockAchievement }) {
+            const [difficulty, setDifficulty] = useState('intermediate');
+            const [text, setText] = useState('');
+            const [userInput, setUserInput] = useState('');
+            const [startTime, setStartTime] = useState(null);
+            const [isComplete, setIsComplete] = useState(false);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [wpm, setWpm] = useState(0);
+            const [accuracy, setAccuracy] = useState(100);
+            const [streak, setStreak] = useState(0);
+            const [floatingScores, setFloatingScores] = useState([]);
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                startNewTest();
+            }, [difficulty]);
+
+            const startNewTest = () => {
+                const texts = sampleTexts[difficulty];
+                setText(texts[Math.floor(Math.random() * texts.length)]);
+                setUserInput('');
+                setStartTime(null);
+                setIsComplete(false);
+                setCurrentIndex(0);
+                setWpm(0);
+                setAccuracy(100);
+                setStreak(0);
+                inputRef.current?.focus();
+            };
+
+            const addFloatingScore = (points, type) => {
+                const id = Date.now();
+                setFloatingScores(prev => [...prev, { id, points, type }]);
+                setTimeout(() => {
+                    setFloatingScores(prev => prev.filter(score => score.id !== id));
+                }, 2000);
+            };
+
+            useEffect(() => {
+                if (userInput.length === 1 && !startTime) {
+                    setStartTime(Date.now());
+                }
+
+                if (userInput.length === text.length && text.length > 0) {
+                    const endTime = Date.now();
+                    const timeInMinutes = (endTime - startTime) / 60000;
+                    const wordsTyped = text.split(' ').length;
+                    const calculatedWpm = Math.round(wordsTyped / timeInMinutes);
+                    
+                    let correctChars = 0;
+                    for (let i = 0; i < text.length; i++) {
+                        if (userInput[i] === text[i]) correctChars++;
+                    }
+                    const calculatedAccuracy = Math.round((correctChars / text.length) * 100);
+                    
+                    setWpm(calculatedWpm);
+                    setAccuracy(calculatedAccuracy);
+                    setIsComplete(true);
+                    
+                    // Calculate XP based on performance
+                    let xpGained = 50;
+                    if (calculatedWpm >= 60) xpGained += 50;
+                    if (calculatedAccuracy >= 95) xpGained += 30;
+                    
+                    // Update user profile
+                    setUserProfile(prev => {
+                        const newProfile = {
+                            ...prev,
+                            xp: prev.xp + xpGained,
+                            level: Math.floor((prev.xp + xpGained) / 1000) + 1,
+                            totalTests: prev.totalTests + 1,
+                            bestWPM: Math.max(prev.bestWPM, calculatedWpm),
+                            averageAccuracy: Math.round(((prev.averageAccuracy * prev.totalTests) + calculatedAccuracy) / (prev.totalTests + 1))
+                        };
+                        
+                        // Check achievements
+                        if (prev.totalTests === 0) unlockAchievement('first_test');
+                        if (calculatedWpm >= 60) unlockAchievement('speed_demon');
+                        if (calculatedAccuracy >= 95) unlockAchievement('accuracy_ace');
+                        
+                        return newProfile;
+                    });
+
+                    addFloatingScore(xpGained, 'xp');
+                }
+
+                setCurrentIndex(userInput.length);
+
+                // Streak calculation
+                if (userInput.length > 0) {
+                    let currentStreak = 0;
+                    for (let i = Math.max(0, userInput.length - 10); i < userInput.length; i++) {
+                        if (userInput[i] === text[i]) {
+                            currentStreak++;
+                        } else {
+                            currentStreak = 0;
+                        }
+                    }
+                    if (currentStreak > streak && currentStreak >= 5) {
+                        setStreak(currentStreak);
+                        if (currentStreak % 10 === 0) {
+                            addFloatingScore(currentStreak, 'streak');
+                        }
+                    }
+                }
+            }, [userInput, text, startTime, streak]);
+
+            const renderText = () => {
+                return text.split('').map((char, index) => {
+                    let className = 'text-xl ';
+                    
+                    if (index < userInput.length) {
+                        className += userInput[index] === char ? 'correct-char' : 'incorrect-char';
+                    } else if (index === currentIndex) {
+                        className += 'current-char';
+                    } else {
+                        className += 'text-gray-400';
+                    }
+                    
+                    return (
+                        <span key={index} className={className}>
+                            {char}
+                        </span>
+                    );
+                });
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto relative">
+                    {/* Floating Scores */}
+                    {floatingScores.map(score => (
+                        <div
+                            key={score.id}
+                            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 floating-score z-50"
+                        >
+                            <div className={`text-2xl font-bold ${
+                                score.type === 'xp' ? 'text-yellow-400' : 'text-orange-400'
+                            }`}>
+                                +{score.points} {score.type === 'xp' ? 'XP' : 'STREAK'}
+                            </div>
+                        </div>
+                    ))}
+
+                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-3xl font-bold text-white">Classic Typing Test</h2>
+                            <button
+                                onClick={() => setCurrentView('games')}
+                                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                            >
+                                Back to Games
+                            </button>
+                        </div>
+
+                        {/* Difficulty Selection */}
+                        <div className="mb-6">
+                            <label className="text-white font-semibold mb-2 block">Difficulty Level:</label>
+                            <div className="flex gap-2">
+                                {['beginner', 'intermediate', 'advanced'].map(level => (
+                                    <button
+                                        key={level}
+                                        onClick={() => setDifficulty(level)}
+                                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                                            difficulty === level 
+                                                ? 'bg-blue-600 text-white' 
+                                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                        }`}
+                                        disabled={startTime && !isComplete}
+                                    >
+                                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Enhanced Stats Display */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-blue-400">
+                                    {startTime ? Math.round(((Date.now() - startTime) / 1000)) : 0}s
+                                </div>
+                                <div className="text-gray-300">Time</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-green-400">
+                                    {Math.round((currentIndex / text.length) * 100)}%
+                                </div>
+                                <div className="text-gray-300">Progress</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-purple-400">
+                                    {startTime ? Math.round((userInput.length / ((Date.now() - startTime) / 60000)) / 5) : 0}
+                                </div>
+                                <div className="text-gray-300">Live WPM</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className={`text-2xl font-bold ${streak >= 10 ? 'text-orange-400 streak-fire' : 'text-yellow-400'}`}>
+                                    {streak} {streak >= 5 && '🔥'}
+                                </div>
+                                <div className="text-gray-300">Streak</div>
+                            </div>
+                        </div>
+
+                        {/* Text Display */}
+                        <div className="bg-white/5 rounded-lg p-6 mb-6 min-h-32 leading-relaxed">
+                            {renderText()}
+                            {currentIndex === text.length && <span className="typing-cursor text-blue-400">|</span>}
+                        </div>
+
+                        {/* Input */}
+                        <textarea
+                            ref={inputRef}
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            className="w-full bg-white/10 text-white rounded-lg p-4 text-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            rows="4"
+                            placeholder="Start typing here..."
+                            disabled={isComplete}
+                        />
+
+                        {/* Results */}
+                        {isComplete && (
+                            <div className="mt-6 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg p-6">
+                                <h3 className="text-2xl font-bold text-white mb-4 text-center">Test Complete! 🎉</h3>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <div className="text-center">
+                                        <div className="text-3xl font-bold text-white">{wpm}</div>
+                                        <div className="text-blue-100">WPM</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-3xl font-bold text-white">{accuracy}%</div>
+                                        <div className="text-blue-100">Accuracy</div>
+                                    </div>
+                                </div>
+                                <div className="text-center mb-4">
+                                    <div className="text-yellow-300 font-semibold">
+                                        Level {userProfile.level} • {userProfile.xp} XP
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 justify-center">
+                                    <button
+                                        onClick={startNewTest}
+                                        className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentView('games')}
+                                        className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Back to Games
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Zen Mode Component
+        function ZenMode({ setCurrentView, userProfile, setUserProfile }) {
+            const [text, setText] = useState('');
+            const [userInput, setUserInput] = useState('');
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [startTime, setStartTime] = useState(null);
+            const [wordCount, setWordCount] = useState(0);
+            const inputRef = useRef(null);
+
+            const zenTexts = [
+                "Breathe in slowly. Feel your fingers find their natural rhythm on the keys. There is no rush, only the gentle flow of words across the screen. Each keystroke is a meditation, each word a step on your journey to mastery.",
+                "In the quiet space between thoughts, your fingers dance. The keyboard becomes an extension of your mind, translating ideas into reality with effortless grace. Focus on the present moment, the current word, the next letter.",
+                "Like water flowing over stones, let your typing be smooth and continuous. There are no mistakes here, only learning. Each character you type brings you closer to harmony between mind and machine."
+            ];
+
+            useEffect(() => {
+                setText(zenTexts[Math.floor(Math.random() * zenTexts.length)]);
+                inputRef.current?.focus();
+            }, []);
+
+            useEffect(() => {
+                if (userInput.length === 1 && !startTime) {
+                    setStartTime(Date.now());
+                }
+
+                setCurrentIndex(userInput.length);
+                setWordCount(userInput.trim().split(' ').filter(word => word.length > 0).length);
+            }, [userInput]);
+
+            const renderText = () => {
+                return text.split('').map((char, index) => {
+                    let className = 'text-xl ';
+                    
+                    if (index < userInput.length) {
+                        className += userInput[index] === char ? 'text-green-300' : 'text-yellow-300';
+                    } else if (index === currentIndex) {
+                        className += 'bg-blue-400 text-white';
+                    } else {
+                        className += 'text-gray-500';
+                    }
+                    
+                    return (
+                        <span key={index} className={className}>
+                            {char}
+                        </span>
+                    );
+                });
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto">
+                    <div className="bg-gradient-to-br from-green-900/30 to-blue-900/30 backdrop-blur-lg rounded-xl p-8">
+                        <div className="flex justify-between items-center mb-8">
+                            <h2 className="text-3xl font-bold text-white">Zen Mode 🧘</h2>
+                            <button
+                                onClick={() => setCurrentView('games')}
+                                className="bg-gray-600/50 hover:bg-gray-700/50 text-white px-4 py-2 rounded-lg transition-colors"
+                            >
+                                Back to Games
+                            </button>
+                        </div>
+
+                        <div className="text-center mb-8">
+                            <p className="text-green-300 text-lg italic">
+                                "Focus on the journey, not the destination. Type at your natural pace."
+                            </p>
+                        </div>
+
+                        {/* Minimal Stats */}
+                        <div className="flex justify-center gap-8 mb-8">
+                            <div className="text-center">
+                                <div className="text-2xl font-light text-white">{wordCount}</div>
+                                <div className="text-gray-400 text-sm">words</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-light text-white">
+                                    {startTime ? Math.round((Date.now() - startTime) / 1000 / 60) : 0}
+                                </div>
+                                <div className="text-gray-400 text-sm">minutes</div>
+                            </div>
+                        </div>
+
+                        {/* Text Display */}
+                        <div className="bg-black/20 rounded-lg p-8 mb-6 min-h-40 leading-relaxed text-center">
+                            {renderText()}
+                            <span className="typing-cursor text-blue-400">|</span>
+                        </div>
+
+                        {/* Input */}
+                        <textarea
+                            ref={inputRef}
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            className="w-full bg-black/20 text-white rounded-lg p-6 text-xl resize-none focus:outline-none focus:ring-2 focus:ring-green-400 border-none"
+                            rows="4"
+                            placeholder="Begin typing... let your thoughts flow naturally"
+                        />
+
+                        <div className="mt-6 text-center">
+                            <button
+                                onClick={() => {
+                                    setText(zenTexts[Math.floor(Math.random() * zenTexts.length)]);
+                                    setUserInput('');
+                                    setStartTime(null);
+                                    setCurrentIndex(0);
+                                    setWordCount(0);
+                                    inputRef.current?.focus();
+                                }}
+                                className="bg-green-600/50 hover:bg-green-700/50 text-white px-6 py-3 rounded-lg font-light transition-colors"
+                            >
+                                New Passage
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Type Racer Component
+        function TypeRacer({ setCurrentView, userProfile, setUserProfile }) {
+            const [raceText, setRaceText] = useState('');
+            const [userInput, setUserInput] = useState('');
+            const [startTime, setStartTime] = useState(null);
+            const [isRacing, setIsRacing] = useState(false);
+            const [countdown, setCountdown] = useState(0);
+            const [playerProgress, setPlayerProgress] = useState(0);
+            const [aiProgress, setAiProgress] = useState(0);
+            const [raceComplete, setRaceComplete] = useState(false);
+            const [winner, setWinner] = useState(null);
+            const inputRef = useRef(null);
+
+            const raceTexts = [
+                "The race is on! Type as fast as you can to beat your AI opponent. Every keystroke counts in this high-speed typing competition.",
+                "Speed and accuracy are your weapons in this digital race. Can you outtype the computer and claim victory?",
+                "Engines revving, fingers ready! This is the ultimate test of your typing prowess against artificial intelligence."
+            ];
+
+            const startRace = () => {
+                setRaceText(raceTexts[Math.floor(Math.random() * raceTexts.length)]);
+                setUserInput('');
+                setStartTime(null);
+                setIsRacing(false);
+                setPlayerProgress(0);
+                setAiProgress(0);
+                setRaceComplete(false);
+                setWinner(null);
+                setCountdown(3);
+                
+                const countdownInterval = setInterval(() => {
+                    setCountdown(prev => {
+                        if (prev <= 1) {
+                            clearInterval(countdownInterval);
+                            setIsRacing(true);
+                            inputRef.current?.focus();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+            };
+
+            useEffect(() => {
+                if (isRacing && !raceComplete) {
+                    const aiInterval = setInterval(() => {
+                        setAiProgress(prev => {
+                            const newProgress = Math.min(prev + Math.random() * 2, 100);
+                            if (newProgress >= 100 && !raceComplete) {
+                                setRaceComplete(true);
+                                setWinner('AI');
+                            }
+                            return newProgress;
+                        });
+                    }, 100);
+
+                    return () => clearInterval(aiInterval);
+                }
+            }, [isRacing, raceComplete]);
+
+            useEffect(() => {
+                if (userInput.length === 1 && !startTime) {
+                    setStartTime(Date.now());
+                }
+
+                const progress = (userInput.length / raceText.length) * 100;
+                setPlayerProgress(progress);
+
+                if (progress >= 100 && !raceComplete) {
+                    setRaceComplete(true);
+                    setWinner('Player');
+                    
+                    // Award XP based on performance
+                    const xpGained = winner === 'Player' ? 100 : 50;
+                    setUserProfile(prev => ({
+                        ...prev,
+                        xp: prev.xp + xpGained,
+                        level: Math.floor((prev.xp + xpGained) / 1000) + 1
+                    }));
+                }
+            }, [userInput, raceText, raceComplete, winner]);
+
+            useEffect(() => {
+                startRace();
+            }, []);
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 backdrop-blur-lg rounded-xl p-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-3xl font-bold text-white">Type Racer 🏎️</h2>
+                            <button
+                                onClick={() => setCurrentView('games')}
+                                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                            >
+                                Back to Games
+                            </button>
+                        </div>
+
+                        {/* Countdown */}
+                        {countdown > 0 && (
+                            <div className="text-center mb-8">
+                                <div className="text-6xl font-bold text-white mb-4">{countdown}</div>
+                                <div className="text-xl text-gray-300">Get ready to race!</div>
+                            </div>
+                        )}
+
+                        {/* Race Track */}
+                        <div className="bg-black/30 rounded-lg p-6 mb-6">
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-blue-400 font-semibold">You 🏎️</span>
+                                    <span className="text-blue-400">{Math.round(playerProgress)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-4">
+                                    <div 
+                                        className="bg-blue-500 h-4 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                                        style={{ width: `${playerProgress}%` }}
+                                    >
+                                        {playerProgress > 10 && <span className="text-white text-xs">🏎️</span>}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-red-400 font-semibold">AI Opponent 🤖</span>
+                                    <span className="text-red-400">{Math.round(aiProgress)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-4">
+                                    <div 
+                                        className="bg-red-500 h-4 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                                        style={{ width: `${aiProgress}%` }}
+                                    >
+                                        {aiProgress > 10 && <span className="text-white text-xs">🤖</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Race Text */}
+                        <div className="bg-white/5 rounded-lg p-6 mb-6">
+                            <div className="text-xl leading-relaxed">
+                                {raceText.split('').map((char, index) => {
+                                    let className = '';
+                                    if (index < userInput.length) {
+                                        className = userInput[index] === char ? 'text-green-400' : 'text-red-400';
+                                    } else if (index === userInput.length) {
+                                        className = 'bg-blue-500 text-white';
+                                    } else {
+                                        className = 'text-gray-400';
+                                    }
+                                    return (
+                                        <span key={index} className={className}>
+                                            {char}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Input */}
+                        <textarea
+                            ref={inputRef}
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            className="w-full bg-white/10 text-white rounded-lg p-4 text-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            rows="3"
+                            placeholder={isRacing ? "Type the text above..." : "Wait for the race to start..."}
+                            disabled={!isRacing || raceComplete}
+                        />
+
+                        {/* Results */}
+                        {raceComplete && (
+                            <div className="mt-6 bg-white/10 rounded-lg p-6 text-center">
+                                <h3 className="text-3xl font-bold text-white mb-4">
+                                    {winner === 'Player' ? '🏆 You Won!' : '😅 AI Wins!'}
+                                </h3>
+                                <p className="text-gray-300 mb-4">
+                                    {winner === 'Player' 
+                                        ? 'Congratulations! You outtyped the AI!' 
+                                        : 'Good effort! Try again to beat the AI!'}
+                                </p>
+                                <div className="flex gap-4 justify-center">
+                                    <button
+                                        onClick={startRace}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Race Again
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentView('games')}
+                                        className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Back to Games
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Typing Ninja Component
+        function TypingNinja({ setCurrentView, userProfile, setUserProfile }) {
+            const [words, setWords] = useState([]);
+            const [currentWord, setCurrentWord] = useState('');
+            const [score, setScore] = useState(0);
+            const [lives, setLives] = useState(3);
+            const [isActive, setIsActive] = useState(false);
+            const [gameOver, setGameOver] = useState(false);
+            const [level, setLevel] = useState(1);
+            const inputRef = useRef(null);
+
+            const ninjaWords = [
+                'swift', 'blade', 'shadow', 'strike', 'focus', 'power', 'speed', 'agile',
+                'stealth', 'warrior', 'master', 'legend', 'honor', 'courage', 'victory'
+            ];
+
+            const spawnWord = () => {
+                const word = ninjaWords[Math.floor(Math.random() * ninjaWords.length)];
+                const newWord = {
+                    id: Date.now(),
+                    text: word,
+                    x: Math.random() * 80 + 10,
+                    y: 0,
+                    speed: 0.5 + (level * 0.2)
+                };
+                setWords(prev => [...prev, newWord]);
+            };
+
+            const startGame = () => {
+                setWords([]);
+                setScore(0);
+                setLives(3);
+                setLevel(1);
+                setIsActive(true);
+                setGameOver(false);
+                setCurrentWord('');
+                inputRef.current?.focus();
+            };
+
+            useEffect(() => {
+                if (isActive && !gameOver) {
+                    const spawnInterval = setInterval(spawnWord, 2000 - (level * 100));
+                    const moveInterval = setInterval(() => {
+                        setWords(prev => {
+                            const newWords = prev.map(word => ({
+                                ...word,
+                                y: word.y + word.speed
+                            })).filter(word => {
+                                if (word.y > 100) {
+                                    setLives(l => l - 1);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            return newWords;
+                        });
+                    }, 50);
+
+                    return () => {
+                        clearInterval(spawnInterval);
+                        clearInterval(moveInterval);
+                    };
+                }
+            }, [isActive, gameOver, level]);
+
+            useEffect(() => {
+                if (lives <= 0) {
+                    setIsActive(false);
+                    setGameOver(true);
+                }
+            }, [lives]);
+
+            useEffect(() => {
+                if (score > 0 && score % 10 === 0) {
+                    setLevel(Math.floor(score / 10) + 1);
+                }
+            }, [score]);
+
+            const handleInputChange = (e) => {
+                const value = e.target.value;
+                setCurrentWord(value);
+
+                // Check if word matches any falling word
+                const matchedWord = words.find(word => word.text === value);
+                if (matchedWord) {
+                    setWords(prev => prev.filter(word => word.id !== matchedWord.id));
+                    setScore(prev => prev + 1);
+                    setCurrentWord('');
+                    
+                    // Award XP
+                    setUserProfile(prev => ({
+                        ...prev,
+                        xp: prev.xp + 10,
+                        level: Math.floor((prev.xp + 10) / 1000) + 1
+                    }));
+                }
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="bg-gradient-to-br from-purple-900/30 to-indigo-900/30 backdrop-blur-lg rounded-xl p-8 min-h-96">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-3xl font-bold text-white">Typing Ninja 🥷</h2>
+                            <button
+                                onClick={() => setCurrentView('games')}
+                                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                            >
+                                Back to Games
+                            </button>
+                        </div>
+
+                        {/* Game Stats */}
+                        <div className="grid grid-cols-4 gap-4 mb-6">
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-purple-400">{score}</div>
+                                <div className="text-gray-300">Score</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-red-400">{'❤️'.repeat(lives)}</div>
+                                <div className="text-gray-300">Lives</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-yellow-400">{level}</div>
+                                <div className="text-gray-300">Level</div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-center">
+                                <div className="text-2xl font-bold text-blue-400">{words.length}</div>
+                                <div className="text-gray-300">Active</div>
+                            </div>
+                        </div>
+
+                        {/* Game Area */}
+                        <div className="relative bg-black/30 rounded-lg h-64 mb-6 overflow-hidden">
+                            {words.map(word => (
+                                <div
+                                    key={word.id}
+                                    className="absolute text-white font-bold text-lg transition-all duration-75"
+                                    style={{
+                                        left: `${word.x}%`,
+                                        top: `${word.y}%`,
+                                        transform: 'translateX(-50%)'
+                                    }}
+                                >
+                                    {word.text}
+                                </div>
+                            ))}
+                            
+                            {!isActive && !gameOver && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <button
+                                        onClick={startGame}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg text-xl font-bold transition-colors"
+                                    >
+                                        Start Ninja Training
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Input */}
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={currentWord}
+                            onChange={handleInputChange}
+                            className="w-full bg-white/10 text-white rounded-lg p-4 text-xl text-center focus:outline-none focus:ring-2 focus:ring-purple-400"
+                            placeholder={isActive ? "Type the falling words..." : "Click Start to begin"}
+                            disabled={!isActive}
+                        />
+
+                        {/* Game Over */}
+                        {gameOver && (
+                            <div className="mt-6 bg-white/10 rounded-lg p-6 text-center">
+                                <h3 className="text-2xl font-bold text-white mb-4">Game Over! 🥷</h3>
+                                <p className="text-gray-300 mb-4">
+                                    You sliced {score} words and reached level {level}!
+                                </p>
+                                <div className="flex gap-4 justify-center">
+                                    <button
+                                        onClick={startGame}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Train Again
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentView('games')}
+                                        className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Back to Games
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Progress Tracker Component
+        function ProgressTracker({ setCurrentView, userProfile }) {
+            const [timeframe, setTimeframe] = useState('week');
+            
+            // Mock data for demonstration
+            const progressData = {
+                week: [45, 52, 48, 58, 62, 59, 65],
+                month: [45, 50, 55, 58, 62, 65, 68, 70, 72, 75, 73, 78, 80, 82, 85, 83, 87, 90, 88, 92, 95, 93, 97, 100, 98, 102, 105, 103, 107, 110],
+                year: [45, 55, 65, 75, 85, 95, 105, 110, 115, 120, 118, 125]
+            };
+
+            const labels = {
+                week: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                month: Array.from({length: 30}, (_, i) => i + 1),
+                year: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-4xl font-bold text-white">Progress Analytics</h2>
+                        <button
+                            onClick={() => setCurrentView('dashboard')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors"
+                        >
+                            Back to Dashboard
+                        </button>
+                    </div>
+
+                    {/* Timeframe Selection */}
+                    <div className="mb-8">
+                        <div className="flex gap-2">
+                            {['week', 'month', 'year'].map(period => (
+                                <button
+                                    key={period}
+                                    onClick={() => setTimeframe(period)}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                                        timeframe === period 
+                                            ? 'bg-blue-600 text-white' 
+                                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                    }`}
+                                >
+                                    {period.charAt(0).toUpperCase() + period.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Stats Overview */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-blue-400">{userProfile.bestWPM}</div>
+                            <div className="text-gray-300">Peak WPM</div>
+                            <div className="text-sm text-green-400 mt-1">↑ +5 this week</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-green-400">{userProfile.averageAccuracy}%</div>
+                            <div className="text-gray-300">Avg Accuracy</div>
+                            <div className="text-sm text-green-400 mt-1">↑ +2% this week</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-purple-400">{userProfile.totalTests}</div>
+                            <div className="text-gray-300">Total Tests</div>
+                            <div className="text-sm text-blue-400 mt-1">+12 this week</div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 text-center">
+                            <div className="text-3xl font-bold text-orange-400">{userProfile.streak}</div>
+                            <div className="text-gray-300">Current Streak</div>
+                            <div className="text-sm text-orange-400 mt-1">🔥 Keep it up!</div>
+                        </div>
+                    </div>
+
+                    {/* Progress Chart */}
+                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8 mb-8">
+                        <h3 className="text-2xl font-bold text-white mb-6">WPM Progress</h3>
+                        <div className="h-64 flex items-end justify-between gap-2">
+                            {progressData[timeframe].map((value, index) => (
+                                <div key={index} className="flex flex-col items-center flex-1">
+                                    <div
+                                        className="bg-gradient-to-t from-blue-600 to-blue-400 rounded-t w-full transition-all duration-500 hover:from-blue-500 hover:to-blue-300"
+                                        style={{ height: `${(value / Math.max(...progressData[timeframe])) * 100}%` }}
+                                        title={`${value} WPM`}
+                                    ></div>
+                                    <div className="text-xs text-gray-400 mt-2">
+                                        {labels[timeframe][index]}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Achievements Progress */}
+                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8">
+                        <h3 className="text-2xl font-bold text-white mb-6">Achievement Progress</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {userProfile.achievements.map(achievement => (
+                                <div
+                                    key={achievement.id}
+                                    className={`p-4 rounded-lg flex items-center gap-4 ${
+                                        achievement.unlocked 
+                                            ? 'bg-green-500/20 border border-green-500/30' 
+                                            : 'bg-white/5 border border-gray-600/30'
+                                    }`}
+                                >
+                                    <span className={`text-3xl ${achievement.unlocked ? '' : 'grayscale'}`}>
+                                        {achievement.icon}
+                                    </span>
+                                    <div className="flex-1">
+                                        <div className={`font-semibold ${
+                                            achievement.unlocked ? 'text-green-400' : 'text-gray-300'
+                                        }`}>
+                                            {achievement.title}
+                                        </div>
+                                        <div className="text-gray-400 text-sm">{achievement.description}</div>
+                                    </div>
+                                    {achievement.unlocked && (
+                                        <div className="text-green-400 font-bold">✓</div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Motivation Center Component
+        function MotivationCenter({ setCurrentView, userProfile }) {
+            const [currentQuote, setCurrentQuote] = useState(0);
+            const [dailyGoal, setDailyGoal] = useState(5);
+            const [todayProgress, setTodayProgress] = useState(3);
+
+            const tips = [
+                {
+                    title: "Perfect Your Posture",
+                    content: "Sit up straight with feet flat on the floor. Your wrists should hover above the keyboard, not rest on it.",
+                    icon: "🪑"
+                },
+                {
+                    title: "Master the Home Row",
+                    content: "Keep your fingers on ASDF and JKL; at all times. This is your foundation for speed and accuracy.",
+                    icon: "🏠"
+                },
+                {
+                    title: "Practice Little and Often",
+                    content: "15 minutes of daily practice is better than 2 hours once a week. Consistency builds muscle memory.",
+                    icon: "⏰"
+                },
+                {
+                    title: "Focus on Accuracy First",
+                    content: "Speed comes naturally with accuracy. It's better to type slowly and correctly than fast with mistakes.",
+                    icon: "🎯"
+                }
+            ];
+
+            const milestones = [
+                { wpm: 20, title: "Beginner Typist", description: "You're getting the hang of it!" },
+                { wpm: 40, title: "Competent Typist", description: "Solid foundation established" },
+                { wpm: 60, title: "Skilled Typist", description: "Above average performance" },
+                { wpm: 80, title: "Expert Typist", description: "Professional level achieved" },
+                { wpm: 100, title: "Typing Master", description: "Elite performance!" }
+            ];
+
+            const nextMilestone = milestones.find(m => m.wpm > userProfile.bestWPM) || milestones[milestones.length - 1];
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-4xl font-bold text-white">Motivation Hub</h2>
+                        <button
+                            onClick={() => setCurrentView('dashboard')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors"
+                        >
+                            Back to Dashboard
+                        </button>
+                    </div>
+
+                    {/* Daily Motivation */}
+                    <div className="bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl p-8 mb-8 text-white">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h3 className="text-2xl font-bold mb-2">Daily Inspiration</h3>
+                                <p className="text-lg italic">"{motivationalQuotes[currentQuote]}"</p>
+                            </div>
+                            <button
+                                onClick={() => setCurrentQuote((currentQuote + 1) % motivationalQuotes.length)}
+                                className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+                            >
+                                New Quote
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Daily Goal */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6">
+                            <h3 className="text-2xl font-bold text-white mb-4">Daily Goal</h3>
+                            <div className="mb-4">
+                                <div className="flex justify-between text-white mb-2">
+                                    <span>Tests Today: {todayProgress}/{dailyGoal}</span>
+                                    <span>{Math.round((todayProgress / dailyGoal) * 100)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-700 rounded-full h-3">
+                                    <div 
+                                        className="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500"
+                                        style={{ width: `${Math.min((todayProgress / dailyGoal) * 100, 100)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setDailyGoal(Math.max(1, dailyGoal - 1))}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
+                                >
+                                    -
+                                </button>
+                                <span className="text-white px-4 py-1">Goal: {dailyGoal}</span>
+                                <button
+                                    onClick={() => setDailyGoal(dailyGoal + 1)}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded transition-colors"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6">
+                            <h3 className="text-2xl font-bold text-white mb-4">Next Milestone</h3>
+                            <div className="text-center">
+                                <div className="text-4xl font-bold text-yellow-400 mb-2">{nextMilestone.wpm} WPM</div>
+                                <div className="text-xl text-white mb-2">{nextMilestone.title}</div>
+                                <div className="text-gray-300 mb-4">{nextMilestone.description}</div>
+                                <div className="text-sm text-blue-400">
+                                    {nextMilestone.wpm - userProfile.bestWPM} WPM to go!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Typing Tips */}
+                    <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8">
+                        <h3 className="text-2xl font-bold text-white mb-6">Pro Typing Tips</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {tips.map((tip, index) => (
+                                <div key={index} className="bg-white/5 rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <span className="text-2xl">{tip.icon}</span>
+                                        <h4 className="text-lg font-semibold text-white">{tip.title}</h4>
+                                    </div>
+                                    <p className="text-gray-300">{tip.content}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96e08cbad521bee9',t:'MTc1NTAwNzc1OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
